@@ -8,7 +8,7 @@ import java.util.PriorityQueue;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.FileNotFoundException;
-public class NGrams{
+public class PosTagging{
 
 /*
 * Command Line input :
@@ -21,23 +21,23 @@ public class NGrams{
 * Command line arguments: args[0] : training file filePath
 * args[1] : test file filePath
 */
-HashMap<String, Integer> wordId = new HashMap<>();
-HashMap<String, Integer> posId = new HashMap<>();
-HashMap<String, Integer> wordCount = new HashMap<>();
-HashMap<String, Integer> posCount = new HashMap<>();
-String transitionCounts[][] = new String[7][7];
-String emmisionCounts[][] = new String[7][36];
+static HashMap<String, Integer> wordId = new HashMap<>();
+static HashMap<String, Integer> posId = new HashMap<>();
+static HashMap<Integer, Integer> wordCount = new HashMap<>();
+static HashMap<Integer, Integer> posCount = new HashMap<>();
+static double transitionCounts[][] = new double[7][7];
+static double emmisionCounts[][] = new double[7][36];
 
 
 public static void main(String args[]){
 String inputFile = args[0]; // path of training txt file
-ArrayList<String> lines = readFile(trainingData); //reads training file and separates into lines
+ArrayList<String> lines = readFile(inputFile); //reads training file and separates into lines
 ArrayList<String> tokenizedLine = tokenize(lines); // puts tokens on lines, and removes classification and stores it in an trainingLabels
 getCounts(tokenizedLine); //
 System.out.println("Transition Probabilities: ");
-String transitionProb[][] = getProbabilities(transitionCounts);
+double transitionProb[][] = getProbabilities(transitionCounts);
 System.out.println("Emission Probabilities: ");
-String emissionProb[][] = getProbabilities(emmisionCounts);
+double emissionProb[][] = getProbabilities(emmisionCounts);
 }
 
 /*
@@ -96,23 +96,23 @@ public static ArrayList<String> tokenize(ArrayList<String> vines){
 
 public static void getCounts(ArrayList<String> lines){
   int pId = 0;
-  int wId = 0;
+  int wId = 1;
   for(String line : lines){
     String tokens[] = line.split(" ");
     for(String token: tokens){
        String items[] = token.split("/");
-       wordCount.put(items[0], 1);
+       wordCount.put(0, 1);
        for(int i = 2; i < items.length + 2; i = i + 2){
          posCount.put(pId, posCount.getOrDefault(pId, 0) + 1);
          wordCount.put(wId, wordCount.getOrDefault(wId, 0) + 1);
-         if(!wordId.containsKey)
-            wId.put(items[i-1], wId++);
+         if(!wordId.containsKey(items[i-1]))
+            wordId.put(items[i-1], wId++);
          if(!posId.containsKey(items[i]))
-            pId.put(items[i], pId++);
+            posId.put(items[i], pId++);
          if(!posId.containsKey(items[i+2]))
-            pId.put(items[i+2], pId++);
-        transitionCounts[pId.get(items[i])][pId.get(items[i+2])] += 1;
-        emmisionCounts[pId.get(items[i])][wId.get(items[i-1])] += 1;
+            posId.put(items[i+2], pId++);
+        transitionCounts[posId.get(items[i])][posId.get(items[i+2])] += 1;
+        emmisionCounts[posId.get(items[i])][wordId.get(items[i-1])] += 1;
        }
     }
   }
@@ -124,32 +124,32 @@ public static void getCounts(ArrayList<String> lines){
 }
 
 
-public static void smoothCounts(String[][] transitionCounts){
+public static void smoothCounts(double[][] transitionCounts){
   for(int i = 0; i < transitionCounts.length; i++){
     for(int j = 0; j < transitionCounts[0].length; j++){
       transitionCounts[i][j] += 1;
-      System.out.print(transitionCounts[i][j]+ ", ")
+      System.out.print(transitionCounts[i][j]+ ", ");
     }
   }
   System.out.println();
 }
 
 
-public static void printTable(String[][] table){
+public static void printTable(double[][] table){
   for(int i = 0; i < table.length; i++){
     for(int j = 0; j < table[0].length; j++)
-      System.out.print(transitionCounts[i][j]+ ", ")
+      System.out.print(transitionCounts[i][j]+ ", ");
   }
   System.out.println();
 }
 
 
-public static String[][] getProbabilities(String[][] table){
-  String [][] prob = new String[table.length][table[0].length]
+public static double[][] getProbabilities(double[][] table){
+  double [][] prob = new double[table.length][table[0].length];
   for(int i = 0; i < table.length; i++){
     for(int j = 0; j < table[0].length; j++){
         prob[i][j] = table[i][j] / posCount.get(i);
-        System.out.print(prob[i][j]+ ", ")
+        System.out.print(prob[i][j]+ ", ");
     }
   }
   return prob;
