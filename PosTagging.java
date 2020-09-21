@@ -25,15 +25,17 @@ HashMap<String, Integer> wordId = new HashMap<>();
 HashMap<String, Integer> posId = new HashMap<>();
 HashMap<String, Integer> wordCount = new HashMap<>();
 HashMap<String, Integer> posCount = new HashMap<>();
-
-
+String transitionCounts[][] = new String[7][7];
+String emmisionCounts[][] = new String[7][36];
 
 
 public static void main(String args[]){
 String inputFile = args[0]; // path of training txt file
 ArrayList<String> lines = readFile(trainingData); //reads training file and separates into lines
 ArrayList<String> tokenizedLine = tokenize(lines); // puts tokens on lines, and removes classification and stores it in an trainingLabels
-String [][] transitionCounts = getTransitionCounts(tokenizedLine); //
+getCounts(tokenizedLine); //
+getProbabilities(transitionCounts);
+getProbabilities(emmisionCounts);
 }
 
 /*
@@ -93,57 +95,59 @@ public static ArrayList<String> tokenize(ArrayList<String> vines){
 public static void getCounts(ArrayList<String> lines){
   int pId = 0;
   int wId = 0;
-  String transitionCounts[][] = new String[7][7];
-  String emmisionCounts[][] = new String[36][7];
   for(String line : lines){
     String tokens[] = line.split(" ");
     for(String token: tokens){
        String items[] = token.split("/");
+       wordCount.put(items[0], 1);
        for(int i = 2; i < items.length + 2; i = i + 2){
-         wordCount.put(items[i], wordCount.getOrDefault(items[i], 0) + 1);
+         posCount.put(pId, posCount.getOrDefault(items[i], 0) + 1);
+         wordCount.put(wId, wordCount.getOrDefault(items[i-1], 0) + 1);
+         if(!wordId.containsKey)
+            wId.put(items[i-1], wId++);
          if(!posId.containsKey(items[i]))
             pId.put(items[i], pId++);
-        if(!posId.containsKey(items[i+2]))
+         if(!posId.containsKey(items[i+2]))
             pId.put(items[i+2], pId++);
         transitionCounts[pId.get(items[i])][pId.get(items[i+2])] += 1;
+        emmisionCounts[pId.get(items[i])][wId.get(items[i-1])] += 1;
        }
     }
   }
-    return smoothCounts(transitionCounts);
+    smoothCounts(transitionCounts);
+    printTable(emmisionCounts);
+
 }
 
 
-public static String[][] smoothCounts(String[][] transitionCounts){
+public static void smoothCounts(String[][] transitionCounts){
   for(int i = 0; i < transitionCounts.length; i++){
-    for(int j = 0; j < transitionCounts[0].length; j++)
+    for(int j = 0; j < transitionCounts[0].length; j++){
       transitionCounts[i][j] += 1;
+      System.out.print(transitionCounts[i][j]+ ", ")
+    }
   }
-  return transitionCounts;
+  System.out.println();
 }
 
-// public static void getCounts(ArrayList<String> lines){
-//   int wID = 0;
-//   int pID = 0;
-//   for(String line : lines){
-//     String tokens[] = line.split(" ");
-//     for(String token: tokens){
-//        String items[] = token.split("/");
-//        for(int i = 1; i < items.length; i = i + 2){
-//          if(!wordId.containsKey(items[i-1]))
-//             wordId.put(items[i-1], wId++);
-//          if(!posId.containsKey(items[i]))
-//             pId.put(items[i], pId++);
-//          tableCounts[wordId.get(items[i-1])][pId.get(items[i])] += 1;
-//        }
-//     }
-//   }
-// }
+public static void printTable(String[][] table){
+  for(int i = 0; i < table.length; i++){
+    for(int j = 0; j < table[0].length; j++)
+      System.out.print(transitionCounts[i][j]+ ", ")
+  }
+  System.out.println();
+}
 
 
-
-
-
-
+public static String[][] getProbabilities(String[][] table){
+  String [][] prob = new String[table.length][table[0].length]
+  for(int i = 0; i < table.length; i++){
+    for(int j = 0; j < table[0].length; j++){
+        prob[i][j] = table[i][j] / posCount.get(i);
+    }
+  }
+  return prob;
+}
 
 
 }
