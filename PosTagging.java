@@ -47,7 +47,6 @@ double emissionProb[][] = getProbabilities(emmisionCounts);
 * Returns the text file as a String
 */
 public static ArrayList<String> readFile(String trainingData){
-  int i = 0; // variable used to point to which part of the arraylist we are in
   ArrayList<String> lines = new ArrayList<String>();
 
   try{
@@ -57,11 +56,7 @@ public static ArrayList<String> readFile(String trainingData){
     while( (line = br.readLine()) != null){
       line = new String(line.getBytes(), "UTF-8"); //making sure the line is UTF-8
       line = line.replace("\uFEFF", ""); // dealing with BOM
-      if(!((line.charAt(0) == 'p' || line.charAt(0) == 'r') && line.charAt(1) == ':'))
-        lines.add(i, lines.get(i)+line);
-      else{
-        i++;
-        lines.add(line);
+      lines.add(line);
       }
     }
 
