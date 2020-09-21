@@ -34,8 +34,10 @@ String inputFile = args[0]; // path of training txt file
 ArrayList<String> lines = readFile(trainingData); //reads training file and separates into lines
 ArrayList<String> tokenizedLine = tokenize(lines); // puts tokens on lines, and removes classification and stores it in an trainingLabels
 getCounts(tokenizedLine); //
-getProbabilities(transitionCounts);
-getProbabilities(emmisionCounts);
+System.out.println("Transition Probabilities: ");
+String transitionProb[][] = getProbabilities(transitionCounts);
+System.out.println("Emission Probabilities: ");
+String emissionProb[][] = getProbabilities(emmisionCounts);
 }
 
 /*
@@ -101,8 +103,8 @@ public static void getCounts(ArrayList<String> lines){
        String items[] = token.split("/");
        wordCount.put(items[0], 1);
        for(int i = 2; i < items.length + 2; i = i + 2){
-         posCount.put(pId, posCount.getOrDefault(items[i], 0) + 1);
-         wordCount.put(wId, wordCount.getOrDefault(items[i-1], 0) + 1);
+         posCount.put(pId, posCount.getOrDefault(pId, 0) + 1);
+         wordCount.put(wId, wordCount.getOrDefault(wId, 0) + 1);
          if(!wordId.containsKey)
             wId.put(items[i-1], wId++);
          if(!posId.containsKey(items[i]))
@@ -114,7 +116,9 @@ public static void getCounts(ArrayList<String> lines){
        }
     }
   }
+    System.out.println("Smoothed Transition Counts: ");
     smoothCounts(transitionCounts);
+    System.out.println("Emission Counts");
     printTable(emmisionCounts);
 
 }
@@ -130,6 +134,7 @@ public static void smoothCounts(String[][] transitionCounts){
   System.out.println();
 }
 
+
 public static void printTable(String[][] table){
   for(int i = 0; i < table.length; i++){
     for(int j = 0; j < table[0].length; j++)
@@ -144,6 +149,7 @@ public static String[][] getProbabilities(String[][] table){
   for(int i = 0; i < table.length; i++){
     for(int j = 0; j < table[0].length; j++){
         prob[i][j] = table[i][j] / posCount.get(i);
+        System.out.print(prob[i][j]+ ", ")
     }
   }
   return prob;
