@@ -25,19 +25,20 @@ static HashMap<String, Integer> wordId = new HashMap<>();
 static HashMap<String, Integer> posId = new HashMap<>();
 static HashMap<Integer, Integer> wordCount = new HashMap<>();
 static HashMap<Integer, Integer> posCount = new HashMap<>();
-static double transitionCounts[][] = new double[7][7];
-static double emmisionCounts[][] = new double[7][36];
+static double transitionCounts[][] = new double[10][10];
+static double emmisionCounts[][] = new double[10][30];
 
 
 public static void main(String args[]){
 String inputFile = args[0]; // path of training txt file
 ArrayList<String> lines = readFile(inputFile); //reads training file and separates into lines
 ArrayList<String> tokenizedLine = tokenize(lines); // puts tokens on lines, and removes classification and stores it in an trainingLabels
-getCounts(tokenizedLine); //
+getCounts(tokenizedLine);
+ //
 System.out.println("Transition Probabilities: ");
-double transitionProb[][] = getProbabilities(transitionCounts);
+//double transitionProb[][] = getProbabilities(transitionCounts);
 System.out.println("Emission Probabilities: ");
-double emissionProb[][] = getProbabilities(emmisionCounts);
+//double emissionProb[][] = getProbabilities(emmisionCounts);
 }
 
 /*
@@ -58,15 +59,14 @@ public static ArrayList<String> readFile(String trainingData){
       line = line.replace("\uFEFF", ""); // dealing with BOM
       lines.add(line);
       }
-    }
-
-    br.close();
-}
- catch(Exception e){
+      br.close();
+  }
+  catch(Exception e){
    System.out.println("IO exception found, re-run code");
  }
   return lines;
 }
+
 
 
 /*
@@ -80,7 +80,7 @@ public static ArrayList<String> tokenize(ArrayList<String> vines){
   for(int i = 0; i < lines.size(); i++){
     StringBuilder sb = new StringBuilder();
     sb.append("<s> ");
-    sb.append(lines.get(i).substring(2,lines.get(i).length()).trim());
+    sb.append(lines.get(i).trim());
     sb.append(" </s> ");
     String s = sb.toString();
     lines.set(i, s);
@@ -90,31 +90,54 @@ public static ArrayList<String> tokenize(ArrayList<String> vines){
 
 
 public static void getCounts(ArrayList<String> lines){
+  wordId.put("<s>", 0);
+  wordId.put("</s>", 1);
   int pId = 0;
-  int wId = 1;
+  int wId = 2;
   for(String line : lines){
+    wordCount.put(0, wordCount.getOrDefault(0, 0)+ 1);
+    wordCount.put(1, wordCount.getOrDefault(1, 0)+ 1);
     String tokens[] = line.split(" ");
-    for(String token: tokens){
-       String items[] = token.split("/");
-       wordCount.put(0, 1);
-       for(int i = 2; i < items.length + 2; i = i + 2){
-         posCount.put(pId, posCount.getOrDefault(pId, 0) + 1);
-         wordCount.put(wId, wordCount.getOrDefault(wId, 0) + 1);
-         if(!wordId.containsKey(items[i-1]))
-            wordId.put(items[i-1], wId++);
-         if(!posId.containsKey(items[i]))
-            posId.put(items[i], pId++);
-         if(!posId.containsKey(items[i+2]))
-            posId.put(items[i+2], pId++);
-        transitionCounts[posId.get(items[i])][posId.get(items[i+2])] += 1;
-        emmisionCounts[posId.get(items[i])][wordId.get(items[i-1])] += 1;
-       }
+    // wordCount.put(0, wordCount.getOrDefault(0, 0)+ 1;
+    ArrayList<String> token = new ArrayList<>();
+    for(String tok : tokens){
+      String arr[] = tok.split("/");
+      if(arr.length == 2){
+        token.add(arr[0]);
+        token.add(arr[1]);
+      }
     }
+    int i = 0;
+    for(i = 0; i < token.size() - 3; i = i + 2){
+      //System.out.println(token.size());
+      //System.out.println(i+" "+(i+1)+" "+(i+3));
+         if(!wordId.containsKey(token.get(i)))
+            wordId.put(token.get(i), wId++);
+         if(!posId.containsKey(token.get(i+1)))
+            posId.put(token.get(i+1), pId++);
+         if(!posId.containsKey(token.get(i+3)))
+            posId.put(token.get(i+3), pId++);
+        //System.out.println("before");
+        posCount.put(posId.get(token.get(i+1)), posCount.getOrDefault(posId.get(token.get(i + 1)), 0) + 1);
+        wordCount.put(wordId.get(token.get(i)), wordCount.getOrDefault(wordId.get(token.get(i)), 0) + 1);
+        transitionCounts[posId.get(token.get(i+1))][posId.get(token.get(i+3))] += 1;
+        //System.out.println("after");
+        //emmisionCounts[posId.get(token.get(i+1))][wordId.get(token.get(i))] += 1;
+       }
+       posCount.put(posId.get(token.get(i+1)), posCount.getOrDefault(posId.get(token.get(i + 1)), 0) + 1);
+       wordCount.put(wordId.get(token.get(i)), wordCount.getOrDefault(wordId.get(token.get(i)), 0) + 1);
+        if(!wordId.containsKey(token.get(i)))
+           wordId.put(token.get(i), wId++);
+        if(!posId.containsKey(token.get(i+1)))
+           posId.put(token.get(i+1), pId++);
+       emmisionCounts[posId.get(token.get(i+1))][wordId.get(token.get(i))] += 1;
   }
+   System.out.println(wordId.entrySet());
+   System.out.println(wordCount.entrySet());
     System.out.println("Smoothed Transition Counts: ");
-    smoothCounts(transitionCounts);
+  //  smoothCounts(transitionCounts);
     System.out.println("Emission Counts");
-    printTable(emmisionCounts);
+  //  printTable();
 
 }
 
@@ -130,10 +153,10 @@ public static void smoothCounts(double[][] transitionCounts){
 }
 
 
-public static void printTable(double[][] table){
-  for(int i = 0; i < table.length; i++){
-    for(int j = 0; j < table[0].length; j++)
-      System.out.print(transitionCounts[i][j]+ ", ");
+public static void printTable(){
+  for(int i = 0; i < emmisionCounts.length; i++){
+    for(int j = 0; j < emmisionCounts[0].length; j++)
+      System.out.print(emmisionCounts[i][j]+ ", ");
   }
   System.out.println();
 }
@@ -143,12 +166,13 @@ public static double[][] getProbabilities(double[][] table){
   double [][] prob = new double[table.length][table[0].length];
   for(int i = 0; i < table.length; i++){
     for(int j = 0; j < table[0].length; j++){
-        prob[i][j] = table[i][j] / posCount.get(i);
+        prob[i][j] = table[i][j] / posCount.getOrDefault(i, 1);
         System.out.print(prob[i][j]+ ", ");
     }
   }
   return prob;
 }
+
 
 
 }
