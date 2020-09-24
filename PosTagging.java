@@ -25,20 +25,28 @@ static HashMap<String, Integer> wordId = new HashMap<>();
 static HashMap<String, Integer> posId = new HashMap<>();
 static HashMap<Integer, Integer> wordCount = new HashMap<>();
 static HashMap<Integer, Integer> posCount = new HashMap<>();
-static double transitionCounts[][] = new double[10][10];
-static double emmisionCounts[][] = new double[10][30];
+static double transitionCounts[][] = new double[11][11];
+static double emmisionCounts[][] = new double[11][36];
+static String one = "<s> <p> show NOUN your PRON light NOUN when ADV nothing NOUN is VERB shining NOUN </s> </p>";
+static String two = "<s> <p> show VERB your PRON light NOUN when ADV nothing NOUN is VERB shining VERB </s> </p>";
+static String three = "<s> <p> show VERB your PRON light NOUN when ADV nothing NOUN is VERB shining NOUN </s> </p>";
 
 
 public static void main(String args[]){
 String inputFile = args[0]; // path of training txt file
 ArrayList<String> lines = readFile(inputFile); //reads training file and separates into lines
 ArrayList<String> tokenizedLine = tokenize(lines); // puts tokens on lines, and removes classification and stores it in an trainingLabels
-getCounts(tokenizedLine);
+getCounts(lines);
  //
 System.out.println("Transition Probabilities: ");
-//double transitionProb[][] = getProbabilities(transitionCounts);
+double transitionProb[][] = getProbabilities(transitionCounts, 0);
+// System.out.println("First"+transitionProb[9][5]);
+// System.out.println("Second"+transitionProb[10][1]);
 System.out.println("Emission Probabilities: ");
-//double emissionProb[][] = getProbabilities(emmisionCounts);
+double emissionProb[][] = getProbabilities(emmisionCounts, 1);
+generateSentenceProbability(transitionProb, emissionProb, one);
+generateSentenceProbability(transitionProb, emissionProb, two);
+generateSentenceProbability(transitionProb, emissionProb, three);
 }
 
 /*
@@ -92,85 +100,96 @@ public static ArrayList<String> tokenize(ArrayList<String> vines){
 public static void getCounts(ArrayList<String> lines){
   wordId.put("<s>", 0);
   wordId.put("</s>", 1);
-  int pId = 0;
+  posId.put("<p>", 0);
+  posId.put("</p>", 1);
+  int pId = 2;
   int wId = 2;
   for(String line : lines){
     wordCount.put(0, wordCount.getOrDefault(0, 0)+ 1);
     wordCount.put(1, wordCount.getOrDefault(1, 0)+ 1);
+    posCount.put(0, posCount.getOrDefault(0, 0)+ 1);
+    posCount.put(1, posCount.getOrDefault(1, 0)+ 1);
     String tokens[] = line.split(" ");
     // wordCount.put(0, wordCount.getOrDefault(0, 0)+ 1;
     ArrayList<String> token = new ArrayList<>();
+    token.add("<s>");
+    token.add("<p>");
     for(String tok : tokens){
       String arr[] = tok.split("/");
       if(arr.length == 2){
-        token.add(arr[0]);
-        token.add(arr[1]);
+        token.add(arr[0].trim());
+        token.add(arr[1].trim());
       }
     }
+    token.add("</s>");
+    token.add("</p>");
     int i = 0;
-    for(i = 0; i < token.size() - 3; i = i + 2){
+    for(i = 2; i < token.size(); i = i + 2){
       //System.out.println(token.size());
       //System.out.println(i+" "+(i+1)+" "+(i+3));
          if(!wordId.containsKey(token.get(i)))
             wordId.put(token.get(i), wId++);
          if(!posId.containsKey(token.get(i+1)))
             posId.put(token.get(i+1), pId++);
-         if(!posId.containsKey(token.get(i+3)))
-            posId.put(token.get(i+3), pId++);
         //System.out.println("before");
         posCount.put(posId.get(token.get(i+1)), posCount.getOrDefault(posId.get(token.get(i + 1)), 0) + 1);
         wordCount.put(wordId.get(token.get(i)), wordCount.getOrDefault(wordId.get(token.get(i)), 0) + 1);
-        transitionCounts[posId.get(token.get(i+1))][posId.get(token.get(i+3))] += 1;
+        transitionCounts[posId.get(token.get(i-1))][posId.get(token.get(i+1))] += 1;
+        emmisionCounts[posId.get(token.get(i+1))][wordId.get(token.get(i))] += 1;
         //System.out.println("after");
         //emmisionCounts[posId.get(token.get(i+1))][wordId.get(token.get(i))] += 1;
        }
-       posCount.put(posId.get(token.get(i+1)), posCount.getOrDefault(posId.get(token.get(i + 1)), 0) + 1);
-       wordCount.put(wordId.get(token.get(i)), wordCount.getOrDefault(wordId.get(token.get(i)), 0) + 1);
-        if(!wordId.containsKey(token.get(i)))
-           wordId.put(token.get(i), wId++);
-        if(!posId.containsKey(token.get(i+1)))
-           posId.put(token.get(i+1), pId++);
-       emmisionCounts[posId.get(token.get(i+1))][wordId.get(token.get(i))] += 1;
-  }
-   System.out.println(wordId.entrySet());
-   System.out.println(wordCount.entrySet());
-    System.out.println("Smoothed Transition Counts: ");
-  //  smoothCounts(transitionCounts);
-    System.out.println("Emission Counts");
-  //  printTable();
 
+  }
+   //System.out.println(posId.entrySet());
+   //System.out.println(wordId.entrySet());
+   System.out.println("Smoothed Transition Counts: ");
+   smoothCounts(transitionCounts);
+   System.out.println("Emission Counts");
+   smoothCounts(emmisionCounts);
 }
 
 
-public static void smoothCounts(double[][] transitionCounts){
-  for(int i = 0; i < transitionCounts.length; i++){
-    for(int j = 0; j < transitionCounts[0].length; j++){
-      transitionCounts[i][j] += 1;
-      System.out.print(transitionCounts[i][j]+ ", ");
+public static void smoothCounts(double[][] counts){
+  for(int i = 0; i < counts.length; i++){
+    System.out.print("[");
+    for(int j = 0; j < counts[0].length; j++){
+      counts[i][j] += 1;
+      System.out.print(counts[i][j]+ ", ");
     }
+    System.out.print("]");
   }
   System.out.println();
 }
 
-
-public static void printTable(){
-  for(int i = 0; i < emmisionCounts.length; i++){
-    for(int j = 0; j < emmisionCounts[0].length; j++)
-      System.out.print(emmisionCounts[i][j]+ ", ");
-  }
-  System.out.println();
-}
-
-
-public static double[][] getProbabilities(double[][] table){
+public static double[][] getProbabilities(double[][] table, int part){
+  //System.out.println("Table 9,5: "+table[9][5]);
+  //System.out.println("Map : "+posCount.get(9));
   double [][] prob = new double[table.length][table[0].length];
   for(int i = 0; i < table.length; i++){
-    for(int j = 0; j < table[0].length; j++){
-        prob[i][j] = table[i][j] / posCount.getOrDefault(i, 1);
+    System.out.println("[");
+    for(int j = 2; j < table[0].length; j++){
+        int x = (part == 0) ? (posCount.get(i) + 11) : (posCount.get(i) + 34);
+        prob[i][j] = table[i][j] / x;
         System.out.print(prob[i][j]+ ", ");
     }
+    System.out.println("]");
   }
   return prob;
+}
+
+
+public static void generateSentenceProbability(double[][] tprob, double[][] wprob, String sent){
+  String tokens[] = sent.split(" ");
+  double prob = 1.0d;
+  int i = 2;
+  for(i = 2; i < tokens.length - 2; i = i + 2)
+     prob *= tprob[posId.get(tokens[i-1])][posId.get(tokens[i+1])] * wprob[posId.get(tokens[i+1])][wordId.get(tokens[i])];
+  System.out.println("first: "+ prob);
+  prob *= tprob[posId.get(tokens[i-1])][1];
+  System.out.println("second "+ prob);
+  System.out.println("Prob for "+ sent);
+  System.out.println(prob);
 }
 
 
