@@ -13,13 +13,18 @@ public class PosTagging{
 
 static HashMap<String, Integer> wordId = new HashMap<>(); // Associates a word with an integer id
 static HashMap<String, Integer> posId = new HashMap<>();  // Associates a POS tag with an integer id
+static int pId = 2; // stores the next id to be assigned for the next unique POS tags
+static int wId = 2; // ^ stores the next ids for the next unique word
+
 static HashMap<Integer, Integer> wordCount = new HashMap<>(); // Stores counts of specific words, used to calculate probabilities
 static HashMap<Integer, Integer> posCount = new HashMap<>(); // stores counts of specific POS tags, used to calculate probabilities
 static int transitionCounts[][] = new int[11][11]; // Matrix for transitionCounts
 static int emmisionCounts[][] = new int[11][36]; // matrix for emmisionCounts
+
 static String one = "<s> <p> show NOUN your PRON light NOUN when ADV nothing NOUN is VERB shining NOUN </s> </p>"; // Three sentences with their POS tags, provided by the question
 static String two = "<s> <p> show VERB your PRON light NOUN when ADV nothing NOUN is VERB shining VERB </s> </p>";
 static String three = "<s> <p> show VERB your PRON light NOUN when ADV nothing NOUN is VERB shining NOUN </s> </p>";
+
 
 /* Main is the driver method that calls all other functions,
 * Command line arguments: args[0] : filePath for txt file to read the data
@@ -69,7 +74,7 @@ public static ArrayList<String> readFile(String trainingData){
 }
 
 
-/* This iterates through the lines from input and stores transitionCounts and emmisionCounts
+/* This iterates through the lines from input and stores transitionCounts and emmisionCounts using method updateCounts()
 * Input : ArrayList<String> lines
 */
 public static void getCounts(ArrayList<String> lines){
@@ -77,9 +82,6 @@ public static void getCounts(ArrayList<String> lines){
   wordId.put("</s>", 1);
   posId.put("<p>", 0);
   posId.put("</p>", 1);
-
-  int pId = 2; // stores the next id to be assigned for the next unique POS tags
-  int wId = 2; // ^ stores the next ids for the next unique word
 
   for(String line : lines){
 
@@ -105,23 +107,29 @@ public static void getCounts(ArrayList<String> lines){
     token.add("</s>"); // adding end of sentence tokens both word and POS
     token.add("</p>");
 
-    int i = 0;
-
-    for(i = 2; i < token.size()-2; i = i + 2){ // i = 2 because first two are <s> and <p>, i < token.size()-2 because last two elements are </s> and </p>
-        if(!wordId.containsKey(token.get(i))) // giving IDs to words
-            wordId.put(token.get(i), wId++); // incrementing next id to be given
-        if(!posId.containsKey(token.get(i+1))) // giving ids to Pos Tags
-            posId.put(token.get(i+1), pId++);
-
-        posCount.put(posId.get(token.get(i+1)), posCount.getOrDefault(posId.get(token.get(i + 1)), 0) + 1); // incrementing the count of PosTag at i+1
-        wordCount.put(wordId.get(token.get(i)), wordCount.getOrDefault(wordId.get(token.get(i)), 0) + 1); // incrementing the count of Word at i
-        transitionCounts[posId.get(token.get(i-1))][posId.get(token.get(i+1))] += 1; // Setting transitionCounts
-        emmisionCounts[posId.get(token.get(i+1))][wordId.get(token.get(i))] += 1; // Setting emmisionCounts
-       }
-
-       transitionCounts[posId.get(token.get(i-1))][posId.get(token.get(i+1))] += 1; // transisiton for end, given last POS tag
-
+    updateCounts(token);
   }
+}
+
+/* This method updates the transitionCounts and emmisionCounts, assigns ids to words and POS tags
+* Input ArrayList<String> token : stores words and pos tokens at alternate indexes.
+*/
+public static void updateCounts(ArrayList<String> token){
+  int i = 0;
+
+  for(i = 2; i < token.size()-2; i = i + 2){ // i = 2 because first two are <s> and <p>, i < token.size()-2 because last two elements are </s> and </p>
+      if(!wordId.containsKey(token.get(i))) // giving IDs to words
+          wordId.put(token.get(i), wId++); // incrementing next id to be given
+      if(!posId.containsKey(token.get(i+1))) // giving ids to Pos Tags
+          posId.put(token.get(i+1), pId++);
+
+      posCount.put(posId.get(token.get(i+1)), posCount.getOrDefault(posId.get(token.get(i + 1)), 0) + 1); // incrementing the count of PosTag at i+1
+      wordCount.put(wordId.get(token.get(i)), wordCount.getOrDefault(wordId.get(token.get(i)), 0) + 1); // incrementing the count of Word at i
+      transitionCounts[posId.get(token.get(i-1))][posId.get(token.get(i+1))] += 1; // Setting transitionCounts
+      emmisionCounts[posId.get(token.get(i+1))][wordId.get(token.get(i))] += 1; // Setting emmisionCounts
+     }
+
+     transitionCounts[posId.get(token.get(i-1))][posId.get(token.get(i+1))] += 1; // transisiton for end, given last POS tag
 }
 
 
@@ -164,6 +172,11 @@ public static double[][] getProbabilities(int[][] table, int part){
 }
 
 
+/* Prints the probability of getting the given tag for the word
+* Input : double tprob[][] : stores transitionProbability
+* double wprob[][] : stores emission probability
+* String sent: Stores input sentence with words and pos alternating.
+*/
 public static void generateSentenceProbability(double[][] tprob, double[][] wprob, String sent){
 
   String tokens[] = sent.split(" "); //split the sentence provided based on spaces
@@ -171,7 +184,7 @@ public static void generateSentenceProbability(double[][] tprob, double[][] wpro
   int i = 2;
 
   for(i = 2; i < tokens.length - 2; i = i + 2)
-     prob *= tprob[posId.get(tokens[i-1])][posId.get(tokens[i+1])] * wprob[posId.get(tokens[i+1])][wordId.get(tokens[i])]; // brute force
+     prob *= tprob[posId.get(tokens[i-1])][posId.get(tokens[i+1])] * wprob[posId.get(tokens[i+1])][wordId.get(tokens[i])]; // brute force expression
 
   prob *= tprob[posId.get(tokens[i-1])][1]; // [1] is the id of end of sentence POS tag.
 
