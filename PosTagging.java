@@ -1,53 +1,46 @@
-/* Class written by Suvinay Bothra on September 16th to classify sentences using language model/ naive bayes classifier
-* Assignment for cmsc395 (NLP) by Dr. Park
+/* Class written by Suvinay Bothra on September 23rd
+* cmsc395 (NLP) by Dr. Park
 */
-import java.util.ArrayList;
+import java.util.ArrayList; // Data Structures
 import java.util.HashMap;
 import java.util.Map;
 import java.util.PriorityQueue;
-import java.io.BufferedReader;
+import java.io.BufferedReader; // Input Output Resources
 import java.io.FileReader;
 import java.io.FileNotFoundException;
+
 public class PosTagging{
 
-/*
-* Command Line input :
-* int part: the question number, int k: k most frequent counts/elements needed
-* int n : specifies n grams, String filePath: specifies the file path to be read.
-* This method is the driver function and calls all other methods that compute N grams.
-*/
-
-/* Main is the driver method that calls all other functions,
-* Command line arguments: args[0] : training file filePath
-* args[1] : test file filePath
-*/
-static HashMap<String, Integer> wordId = new HashMap<>();
-static HashMap<String, Integer> posId = new HashMap<>();
-static HashMap<Integer, Integer> wordCount = new HashMap<>();
-static HashMap<Integer, Integer> posCount = new HashMap<>();
-static double transitionCounts[][] = new double[11][11];
-static double emmisionCounts[][] = new double[11][36];
-static String one = "<s> <p> show NOUN your PRON light NOUN when ADV nothing NOUN is VERB shining NOUN </s> </p>";
+static HashMap<String, Integer> wordId = new HashMap<>(); // Associates a word with an integer id
+static HashMap<String, Integer> posId = new HashMap<>();  // Associates a POS tag with an integer id
+static HashMap<Integer, Integer> wordCount = new HashMap<>(); // Stores counts of specific words, used to calculate probabilities
+static HashMap<Integer, Integer> posCount = new HashMap<>(); // stores counts of specific POS tags, used to calculate probabilities
+static int transitionCounts[][] = new int[11][11]; // Matrix for transitionCounts
+static int emmisionCounts[][] = new int[11][36]; // matrix for emmisionCounts
+static String one = "<s> <p> show NOUN your PRON light NOUN when ADV nothing NOUN is VERB shining NOUN </s> </p>"; // Three sentences with their POS tags, provided by the question
 static String two = "<s> <p> show VERB your PRON light NOUN when ADV nothing NOUN is VERB shining VERB </s> </p>";
 static String three = "<s> <p> show VERB your PRON light NOUN when ADV nothing NOUN is VERB shining NOUN </s> </p>";
 
-
+/* Main is the driver method that calls all other functions,
+* Command line arguments: args[0] : filePath for txt file to read the data
+*/
 public static void main(String args[]){
 String inputFile = args[0]; // path of training txt file
 ArrayList<String> lines = readFile(inputFile); //reads training file and separates into lines
-ArrayList<String> tokenizedLine = tokenize(lines); // puts tokens on lines, and removes classification and stores it in an trainingLabels
-getCounts(lines);
- //
-System.out.println("Transition Probabilities: ");
-double transitionProb[][] = getProbabilities(transitionCounts, 0);
-// System.out.println("First"+transitionProb[9][5]);
-// System.out.println("Second"+transitionProb[10][1]);
+getCounts(lines); // Goes through all lines and fills the transitionCounts and emmisionCounts
+int smoothedTc[][] = smoothCounts(transitionCounts); // Add 1 smoothing to transitionCounts
+int smoothedEc[][] = smoothCounts(emmisionCounts); // Add 1 smoothing to transitionProb
+
+System.out.println("Transisiton Probabilities: ");
+double transitionProb[][] = getProbabilities(smoothedTc, 0);
 System.out.println("Emission Probabilities: ");
-double emissionProb[][] = getProbabilities(emmisionCounts, 1);
-generateSentenceProbability(transitionProb, emissionProb, one);
+double emissionProb[][] = getProbabilities(smoothedEc, 1);
+
+generateSentenceProbability(transitionProb, emissionProb, one); // generates the POS tag probability for the provided 3 sentences
 generateSentenceProbability(transitionProb, emissionProb, two);
 generateSentenceProbability(transitionProb, emissionProb, three);
 }
+
 
 /*
 * This method reads the file for the corpus
@@ -76,44 +69,31 @@ public static ArrayList<String> readFile(String trainingData){
 }
 
 
-
-/*
-* This method puts start and end of line tokens into arraylist of sentences and removes the preceding p: or r: and sets the trainingLabels
-* Parameters:
-* ArrayList<String> lines: stores the lines read from input files
-* Returns the String with start and end tokens added and p: r: removed from the start
+/* This iterates through the lines from input and stores transitionCounts and emmisionCounts
+* Input : ArrayList<String> lines
 */
-public static ArrayList<String> tokenize(ArrayList<String> vines){
-  ArrayList<String> lines = new ArrayList<>(vines);
-  for(int i = 0; i < lines.size(); i++){
-    StringBuilder sb = new StringBuilder();
-    sb.append("<s> ");
-    sb.append(lines.get(i).trim());
-    sb.append(" </s> ");
-    String s = sb.toString();
-    lines.set(i, s);
-  }
-  return lines;
-}
-
-
 public static void getCounts(ArrayList<String> lines){
-  wordId.put("<s>", 0);
+  wordId.put("<s>", 0); // Giving fixed integers id's  to start/ end word/POS tokens
   wordId.put("</s>", 1);
   posId.put("<p>", 0);
   posId.put("</p>", 1);
-  int pId = 2;
-  int wId = 2;
+
+  int pId = 2; // stores the next id to be assigned for the next unique POS tags
+  int wId = 2; // ^ stores the next ids for the next unique word
+
   for(String line : lines){
-    wordCount.put(0, wordCount.getOrDefault(0, 0)+ 1);
+
+    wordCount.put(0, wordCount.getOrDefault(0, 0)+ 1); // For every line, increment Start, End Word tokens and Start, END pos token
     wordCount.put(1, wordCount.getOrDefault(1, 0)+ 1);
     posCount.put(0, posCount.getOrDefault(0, 0)+ 1);
     posCount.put(1, posCount.getOrDefault(1, 0)+ 1);
-    String tokens[] = line.split(" ");
-    // wordCount.put(0, wordCount.getOrDefault(0, 0)+ 1;
-    ArrayList<String> token = new ArrayList<>();
-    token.add("<s>");
-    token.add("<p>");
+
+    String tokens[] = line.split(" "); // split line based on space
+    ArrayList<String> token = new ArrayList<>(); // THis list will store every token of type WORD/POS
+
+    token.add("<s>"); // NOTE: token and tokens are different variables
+    token.add("<p>"); // token.get(i) will contain word, token.get(i+1) will contain posTag
+
     for(String tok : tokens){
       String arr[] = tok.split("/");
       if(arr.length == 2){
@@ -121,58 +101,63 @@ public static void getCounts(ArrayList<String> lines){
         token.add(arr[1].trim());
       }
     }
-    token.add("</s>");
+
+    token.add("</s>"); // adding end of sentence tokens both word and POS
     token.add("</p>");
+
     int i = 0;
-    for(i = 2; i < token.size(); i = i + 2){
-      //System.out.println(token.size());
-      //System.out.println(i+" "+(i+1)+" "+(i+3));
-         if(!wordId.containsKey(token.get(i)))
-            wordId.put(token.get(i), wId++);
-         if(!posId.containsKey(token.get(i+1)))
+
+    for(i = 2; i < token.size()-2; i = i + 2){ // i = 2 because first two are <s> and <p>, i < token.size()-2 because last two elements are </s> and </p>
+        if(!wordId.containsKey(token.get(i))) // giving IDs to words
+            wordId.put(token.get(i), wId++); // incrementing next id to be given
+        if(!posId.containsKey(token.get(i+1))) // giving ids to Pos Tags
             posId.put(token.get(i+1), pId++);
-        //System.out.println("before");
-        posCount.put(posId.get(token.get(i+1)), posCount.getOrDefault(posId.get(token.get(i + 1)), 0) + 1);
-        wordCount.put(wordId.get(token.get(i)), wordCount.getOrDefault(wordId.get(token.get(i)), 0) + 1);
-        transitionCounts[posId.get(token.get(i-1))][posId.get(token.get(i+1))] += 1;
-        emmisionCounts[posId.get(token.get(i+1))][wordId.get(token.get(i))] += 1;
-        //System.out.println("after");
-        //emmisionCounts[posId.get(token.get(i+1))][wordId.get(token.get(i))] += 1;
+
+        posCount.put(posId.get(token.get(i+1)), posCount.getOrDefault(posId.get(token.get(i + 1)), 0) + 1); // incrementing the count of PosTag at i+1
+        wordCount.put(wordId.get(token.get(i)), wordCount.getOrDefault(wordId.get(token.get(i)), 0) + 1); // incrementing the count of Word at i
+        transitionCounts[posId.get(token.get(i-1))][posId.get(token.get(i+1))] += 1; // Setting transitionCounts
+        emmisionCounts[posId.get(token.get(i+1))][wordId.get(token.get(i))] += 1; // Setting emmisionCounts
        }
 
+       transitionCounts[posId.get(token.get(i-1))][posId.get(token.get(i+1))] += 1; // transisiton for end, given last POS tag
+
   }
-   //System.out.println(posId.entrySet());
-   //System.out.println(wordId.entrySet());
-   System.out.println("Smoothed Transition Counts: ");
-   smoothCounts(transitionCounts);
-   System.out.println("Emission Counts");
-   smoothCounts(emmisionCounts);
 }
 
 
-public static void smoothCounts(double[][] counts){
+/*Performs Add 1 smoothing on both transitionCounts and emmisionCounts
+* Input: int[][] counts
+* Output: int[][] counts (smoothed)
+*/
+public static int[][] smoothCounts(int[][] counts){
+
   for(int i = 0; i < counts.length; i++){
-    System.out.print("[");
-    for(int j = 0; j < counts[0].length; j++){
+    for(int j = 0; j < counts[0].length; j++)
       counts[i][j] += 1;
-      System.out.print(counts[i][j]+ ", ");
     }
-    System.out.print("]");
-  }
-  System.out.println();
+
+  return counts;
 }
 
-public static double[][] getProbabilities(double[][] table, int part){
-  //System.out.println("Table 9,5: "+table[9][5]);
-  //System.out.println("Map : "+posCount.get(9));
+
+/* Method for computing the probability matrix given counts for both emission and transisiton
+* Input: int[][] table : 2d array of counts (transition if part == 0, else emission)
+* int part : specifies which probability is being calculated: emission vs transition
+* Output: doube[][] prob with transition/emission probability depending on the part
+*/
+public static double[][] getProbabilities(int[][] table, int part){
   double [][] prob = new double[table.length][table[0].length];
+
   for(int i = 0; i < table.length; i++){
-    System.out.println("[");
-    for(int j = 2; j < table[0].length; j++){
-        int x = (part == 0) ? (posCount.get(i) + 11) : (posCount.get(i) + 34);
-        prob[i][j] = table[i][j] / x;
+    System.out.println("["); // for formatting
+
+    for(int j = (part == 0) ? 0 : 2; j < table[0].length; j++){
+        int x = (part == 0) ? (posCount.get(i) + 11) : (posCount.get(i) + 34); // Number of occurences of 11 POS Tags including <p> and </p>, 34 Words excluding <s> </s>
+        prob[i][j] = (double)table[i][j] / x; // computes probability
         System.out.print(prob[i][j]+ ", ");
     }
+
+    System.out.println(); // for formatting
     System.out.println("]");
   }
   return prob;
@@ -180,17 +165,34 @@ public static double[][] getProbabilities(double[][] table, int part){
 
 
 public static void generateSentenceProbability(double[][] tprob, double[][] wprob, String sent){
-  String tokens[] = sent.split(" ");
+
+  String tokens[] = sent.split(" "); //split the sentence provided based on spaces
   double prob = 1.0d;
   int i = 2;
+
   for(i = 2; i < tokens.length - 2; i = i + 2)
-     prob *= tprob[posId.get(tokens[i-1])][posId.get(tokens[i+1])] * wprob[posId.get(tokens[i+1])][wordId.get(tokens[i])];
-  System.out.println("first: "+ prob);
-  prob *= tprob[posId.get(tokens[i-1])][1];
-  System.out.println("second "+ prob);
+     prob *= tprob[posId.get(tokens[i-1])][posId.get(tokens[i+1])] * wprob[posId.get(tokens[i+1])][wordId.get(tokens[i])]; // brute force
+
+  prob *= tprob[posId.get(tokens[i-1])][1]; // [1] is the id of end of sentence POS tag.
+
+  System.out.println();
   System.out.println("Prob for "+ sent);
   System.out.println(prob);
+
 }
+
+
+// public static void debugMatrix(double[][] arr){
+//   System.out.println(posId);
+//   for(int i = 0; i < arr.length; i++){
+//     System.out.println("[");
+//     for(int j = 0; j < arr[0].length; j++){
+//       System.out.println(arr[i][j]);
+//     }
+//     System.out.println();
+//     System.out.println("]");
+//   }
+// }
 
 
 
