@@ -11,6 +11,8 @@ import java.io.FileNotFoundException;
 
 public class PosTagging{
 
+static double K = 0.5; // change K as you please for add K smoothing
+
 static HashMap<String, Integer> wordId = new HashMap<>(); // Associates a word with an integer id
 static HashMap<String, Integer> posId = new HashMap<>();  // Associates a POS tag with an integer id
 static int pId = 2; // stores the next id to be assigned for the next unique POS tags
@@ -26,24 +28,38 @@ static String two = "<s> <p> show VERB your PRON light NOUN when ADV nothing NOU
 static String three = "<s> <p> show VERB your PRON light NOUN when ADV nothing NOUN is VERB shining NOUN </s> </p>";
 
 
+
 /* Main is the driver method that calls all other functions,
 * Command line arguments: args[0] : filePath for txt file to read the data
 */
 public static void main(String args[]){
 String inputFile = args[0]; // path of training txt file
 ArrayList<String> lines = readFile(inputFile); //reads training file and separates into lines
+
 getCounts(lines); // Goes through all lines and fills the transitionCounts and emmisionCounts
+
 int smoothedTc[][] = smoothCounts(transitionCounts); // Add 1 smoothing to transitionCounts
 int smoothedEc[][] = smoothCounts(emmisionCounts); // Add 1 smoothing to transitionProb
 
+System.out.println("Use these pos tag ids to navigate row column"+ posId);
+System.out.println("Smoothed Transition Counts: ");
+printMatrix(smoothedTc); // print
+System.out.println("Use these words ids to navigate row column"+ wordId);
+System.out.println("Smoothed Emission Counts: ");
+printMatrix(smoothedEc);
+
 System.out.println("Transisiton Probabilities: ");
 double transitionProb[][] = getProbabilities(smoothedTc, 0);
+
 System.out.println("Emission Probabilities: ");
 double emissionProb[][] = getProbabilities(smoothedEc, 1);
 
 generateSentenceProbability(transitionProb, emissionProb, one); // generates the POS tag probability for the provided 3 sentences
 generateSentenceProbability(transitionProb, emissionProb, two);
 generateSentenceProbability(transitionProb, emissionProb, three);
+
+String v_input = "show your light when nothing is shining";
+viterbi(v_input);
 }
 
 
@@ -51,7 +67,7 @@ generateSentenceProbability(transitionProb, emissionProb, three);
 * This method reads the file for the corpus
 * Parameters:
 * String path: Stores the file path of the input text file
-* Returns the text file as a String
+* Returns the text file as an ArrayList<String> of each line of the test file
 */
 public static ArrayList<String> readFile(String trainingData){
   ArrayList<String> lines = new ArrayList<String>();
@@ -108,6 +124,7 @@ public static void getCounts(ArrayList<String> lines){
     token.add("</p>");
 
     updateCounts(token);
+
   }
 }
 
@@ -195,17 +212,59 @@ public static void generateSentenceProbability(double[][] tprob, double[][] wpro
 }
 
 
-// public static void debugMatrix(double[][] arr){
-//   System.out.println(posId);
-//   for(int i = 0; i < arr.length; i++){
-//     System.out.println("[");
-//     for(int j = 0; j < arr[0].length; j++){
-//       System.out.println(arr[i][j]);
-//     }
-//     System.out.println();
-//     System.out.println("]");
-//   }
-// }
+/* Prints input matrix
+* Input: int arr[][]
+*/
+public static void printMatrix(int[][] arr){
+  for(int i = 0; i < arr.length; i++){
+    System.out.println("[");
+    for(int j = 0; j < arr[0].length; j++){
+      System.out.print(arr[i][j]+", ");
+    }
+    System.out.println();
+    System.out.println("]");
+  }
+}
+
+
+public static void viterbi(String str){
+  double v[][] = new double[11][str.length()];
+  int backpointer[][] = new double[11][str.length()];
+  String words[] = str.split(" ");
+  //initialization step
+  for(int s = 0; s < 11; s++){
+    v[s][0] =  transitionProb[0][s] * emissionProb[s][wordId.get(words[0])];
+    backpointer[e.getValue()][0] = 0;
+  }
+
+  double temp = 0;
+  //recursion step
+  for(int t = 1; i < str.length(); t++){
+    for(int s = 0; s < 11; s++ ){
+      double max = -1;
+      int pointer = -1;
+      for(int n = 0; n < 11; n++){
+      temp = v[s][t-1] * transitionProb[n][s] * emissionProb[s][t];
+      if(temp > max){pointer = n;}
+      max = Math.max(temp, max);
+     }
+     v[s][t] = max;
+     backpointer[s][t] = pointer;
+    }
+  }
+  //termination step
+  String path[] = new String[11];
+  double max = -1.0;
+  int pointer = -1.0;
+  for(int s = 0; s < 11; s++){
+      if(v[s][str.length()] > max){
+        pointer = s;
+        max = v[s][str.length];
+      }
+  }
+  System.out.println(" Max Probability for this sentence is :" + max);
+
+}
 
 
 
