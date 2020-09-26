@@ -11,8 +11,7 @@ import java.io.FileNotFoundException;
 
 public class PosTagging{
 
-static double K = 0.5; // change K as you please for add K smoothing
-
+static double K = 0.75; // change K as you please for add K smoothing5
 static HashMap<String, Integer> wordId = new HashMap<>(); // Associates a word with an integer id
 static HashMap<String, Integer> posId = new HashMap<>();  // Associates a POS tag with an integer id
 static int pId = 2; // stores the next id to be assigned for the next unique POS tags
@@ -20,8 +19,8 @@ static int wId = 2; // ^ stores the next ids for the next unique word
 
 static HashMap<Integer, Integer> wordCount = new HashMap<>(); // Stores counts of specific words, used to calculate probabilities
 static HashMap<Integer, Integer> posCount = new HashMap<>(); // stores counts of specific POS tags, used to calculate probabilities
-static int transitionCounts[][] = new int[11][11]; // Matrix for transitionCounts
-static int emmisionCounts[][] = new int[11][36]; // matrix for emmisionCounts
+static double transitionCounts[][] = new double[11][11]; // Matrix for transitionCounts
+static double emmisionCounts[][] = new double[11][36]; // matrix for emmisionCounts
 
 static String one = "<s> <p> show NOUN your PRON light NOUN when ADV nothing NOUN is VERB shining NOUN </s> </p>"; // Three sentences with their POS tags, provided by the question
 static String two = "<s> <p> show VERB your PRON light NOUN when ADV nothing NOUN is VERB shining VERB </s> </p>";
@@ -38,8 +37,8 @@ ArrayList<String> lines = readFile(inputFile); //reads training file and separat
 
 getCounts(lines); // Goes through all lines and fills the transitionCounts and emmisionCounts
 
-int smoothedTc[][] = smoothCounts(transitionCounts); // Add 1 smoothing to transitionCounts
-int smoothedEc[][] = smoothCounts(emmisionCounts); // Add 1 smoothing to transitionProb
+double smoothedTc[][] = smoothCounts(transitionCounts); // Add 1 smoothing to transitionCounts
+double smoothedEc[][] = smoothCounts(emmisionCounts); // Add 1 smoothing to transitionProb
 
 System.out.println("Use these pos tag ids to navigate row column"+ posId);
 System.out.println("Smoothed Transition Counts: ");
@@ -59,7 +58,17 @@ generateSentenceProbability(transitionProb, emissionProb, two);
 generateSentenceProbability(transitionProb, emissionProb, three);
 
 String v_input = "show your light when nothing is shining";
-viterbi(v_input);
+viterbi(v_input, transitionProb, emissionProb);
+
+double kSmoothedTc[][] = kSmoothCounts(transitionCounts); // Add k smoothing to transitionCounts
+double kSmoothedEc[][] = kSmoothCounts(emmisionCounts); // Add k smoothing to transitionProb
+
+double kTransitionProb[][] = getSmoothProbabilities(kSmoothedTc, 0);
+double kEmissionProb[][] = getSmoothProbabilities(kSmoothedEc, 1);
+
+System.out.println("These are k smoothed results with k: "+K);
+viterbi(v_input, kTransitionProb, kEmissionProb);
+
 }
 
 
@@ -154,11 +163,26 @@ public static void updateCounts(ArrayList<String> token){
 * Input: int[][] counts
 * Output: int[][] counts (smoothed)
 */
-public static int[][] smoothCounts(int[][] counts){
+public static double[][] smoothCounts(double[][] counts){
 
   for(int i = 0; i < counts.length; i++){
     for(int j = 0; j < counts[0].length; j++)
       counts[i][j] += 1;
+    }
+
+  return counts;
+}
+
+
+/*Performs Add K smoothing on both transitionCounts and emmisionCounts
+* Input: int[][] counts
+* Output: double[][] counts (smoothed)
+*/
+public static double[][] kSmoothCounts(double[][] counts){
+
+  for(int i = 0; i < counts.length; i++){
+    for(int j = 0; j < counts[0].length; j++)
+      counts[i][j] += K;
     }
 
   return counts;
@@ -170,16 +194,16 @@ public static int[][] smoothCounts(int[][] counts){
 * int part : specifies which probability is being calculated: emission vs transition
 * Output: doube[][] prob with transition/emission probability depending on the part
 */
-public static double[][] getProbabilities(int[][] table, int part){
+public static double[][] getProbabilities(double[][] table, int part){
   double [][] prob = new double[table.length][table[0].length];
 
-  for(int i = 0; i < table.length; i++){
+  for(int i = (part == 0) ? 0 : 2; i < table.length; i++){
     System.out.println("["); // for formatting
 
-    for(int j = (part == 0) ? 0 : 2; j < table[0].length; j++){
+    for(int j = 0; j < table[0].length; j++){
         int x = (part == 0) ? (posCount.get(i) + 11) : (posCount.get(i) + 34); // Number of occurences of 11 POS Tags including <p> and </p>, 34 Words excluding <s> </s>
-        prob[i][j] = (double)table[i][j] / x; // computes probability
-        System.out.print(prob[i][j]+ ", ");
+        prob[i][j] = table[i][j] / x; // computes probability
+        System.out.print(prob[i][j]);
     }
 
     System.out.println(); // for formatting
@@ -187,6 +211,28 @@ public static double[][] getProbabilities(int[][] table, int part){
   }
   return prob;
 }
+
+/* This method generates probabilities for k smoothed Count
+* Input: double[][] table (smoother emission or transition count)
+*/
+public static double[][] getSmoothProbabilities(double[][] table, int part){
+  double [][] prob = new double[table.length][table[0].length];
+
+  for(int i = (part == 0) ? 0 : 2; i < table.length; i++){
+    System.out.println("["); // for formatting
+
+    for(int j = 0; j < table[0].length; j++){
+        double x = (part == 0) ? (posCount.get(i) + (K*11)) : (posCount.get(i)+ (K*34)); // Number of occurences of 11 POS Tags including <p> and </p>, 34 Words excluding <s> </s>
+        prob[i][j] = table[i][j] / x; // computes probability
+        System.out.print(prob[i][j]);
+    }
+
+    System.out.println(); // for formatting
+    System.out.println("]");
+  }
+  return prob;
+}
+
 
 
 /* Prints the probability of getting the given tag for the word
@@ -212,10 +258,10 @@ public static void generateSentenceProbability(double[][] tprob, double[][] wpro
 }
 
 
-/* Prints input matrix
-* Input: int arr[][]
+/* Prints input matrix for testing purposes etc
+* Input: double arr[][]
 */
-public static void printMatrix(int[][] arr){
+public static void printMatrix(double[][] arr){
   for(int i = 0; i < arr.length; i++){
     System.out.println("[");
     for(int j = 0; j < arr[0].length; j++){
@@ -226,46 +272,83 @@ public static void printMatrix(int[][] arr){
   }
 }
 
+/*Implementation of the viterbi algorithm citing the Jurafsky NLP Book pseudo code
+* Takes input : doube transitionProb[], double emissionProbp[][]
+* String str : sentence for which we are generating tag sequence
+* Prints Tag most likely sequence
+*/
 
-public static void viterbi(String str){
-  double v[][] = new double[11][str.length()];
-  int backpointer[][] = new double[11][str.length()];
+public static void viterbi(String str, double transitionProb[][], double emissionProb[][]){
+
   String words[] = str.split(" ");
+  double v[][] = new double[11][words.length];
+  int backpointer[][] = new int[11][words.length];
   //initialization step
-  for(int s = 0; s < 11; s++){
+  for(int s = 2; s < 11; s++){
     v[s][0] =  transitionProb[0][s] * emissionProb[s][wordId.get(words[0])];
-    backpointer[e.getValue()][0] = 0;
+    backpointer[s][0] = 0;
   }
 
   double temp = 0;
+
   //recursion step
-  for(int t = 1; i < str.length(); t++){
-    for(int s = 0; s < 11; s++ ){
+  for(int t = 1; t < words.length; t++){
+
+    for(int s = 2; s < 11; s++ ){
+
       double max = -1;
       int pointer = -1;
-      for(int n = 0; n < 11; n++){
-      temp = v[s][t-1] * transitionProb[n][s] * emissionProb[s][t];
-      if(temp > max){pointer = n;}
-      max = Math.max(temp, max);
+
+      for(int n = 2; n < 11; n++){
+        temp = v[s][t-1] * transitionProb[n][s] * emissionProb[s][wordId.get(words[t])];
+        if(temp > max){pointer = n;}
+        max = Math.max(temp, max);
+
      }
      v[s][t] = max;
      backpointer[s][t] = pointer;
     }
   }
-  //termination step
-  String path[] = new String[11];
+
   double max = -1.0;
-  int pointer = -1.0;
-  for(int s = 0; s < 11; s++){
-      if(v[s][str.length()] > max){
+  int pointer = -1; // argmax
+  //termination step
+  for(int s = 2; s < 11; s++){
+      if(v[s][words.length-1] > max){
         pointer = s;
-        max = v[s][str.length];
+        max = v[s][words.length-1];
       }
   }
-  System.out.println(" Max Probability for this sentence is :" + max);
-
+  System.out.println("Viterbi Table");
+  printMatrix(v);
+  backtrack(backpointer, words.length, pointer, v);
 }
 
+/*Performs the backtrack part of the viterbi alogrithm by tracing backpointer
+* Input : int backpointer[][], int len : number of words in the input sentence for Viterbi
+* int pointer : stores argmax we get this from viterbi()
+* Prints most likely tag sequence
+*/
+public static void backtrack(int backpointer[][], int len, int pointer, double[][] v){
+  int output[] = new int[len];
+  int col = len-1;
+  output[col] = pointer;
+  int z = -1;
 
+  for(int i = len - 2 ; i > -1; i--){
+      pointer = backpointer[pointer][col--];
+      output[i] = pointer;
+  }
+
+  System.out.println("The final word sequence: ");
+
+  for(int i = 0; i < output.length; i++){
+  for(String s: posId.keySet()){
+    if(output[i] == posId.get(s))
+      System.out.print(s+" ");
+  }
+}
+
+}
 
 }
